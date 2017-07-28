@@ -1,20 +1,17 @@
 // The Computer Language Benchmarks Game
 // http://benchmarksgame.alioth.debian.org/
 //
-// contributed by Mrjillhace
-
-extern crate fnv;
+// Originally contributed by Mrjillhace improved by CodeSandwich
 
 use std::thread;
 use std::sync::Arc;
 use std::collections::HashMap;
-use std::hash::BuildHasherDefault;
-use fnv::FnvHasher;
+use std::hash::{BuildHasherDefault, Hasher};
 
 const SEQ_LENS: [usize; 7] = [1, 2, 3, 4, 6, 12, 18];
 const LOOKUPS: [&'static str; 5] = ["GGT", "GGTA", "GGTATT", "GGTATTTTAATT", "GGTATTTTAATTTATAGT"];
 
-type Table = HashMap<u64, usize, BuildHasherDefault<FnvHasher>>;
+type Table = HashMap<u64, usize, BuildHasherDefault<U64Hasher>>;
 
 fn encode(c: char) -> u8 {
     match c {
@@ -54,13 +51,29 @@ struct Buffer{
 
 impl Buffer {
     fn push(&mut self, c: u8) {
-        self.value = (self.value * (1 << 2)) % (1 << (2 * self.size)) + (c as u64);
+        self.value = (self.value << 2) % (1 << (2 * self.size)) + (c as u64);
+    }
+}
+
+#[derive(Default)]
+struct U64Hasher {
+    hash: u64,
+}
+
+impl Hasher for U64Hasher {
+    fn finish(&self) -> u64 {
+        self.hash
+    }
+
+    fn write(&mut self, _: &[u8]) {}
+
+    fn write_u64(&mut self, i: u64) {
+        self.hash = i;
     }
 }
 
 fn parse(mut input: &[u8], len: usize) -> Table {
-    let fnv = BuildHasherDefault::<FnvHasher>::default();
-    let mut table = Table::with_hasher(fnv);
+    let mut table = Table::with_hasher(BuildHasherDefault::<U64Hasher>::default());
     let mut buffer = Buffer{ value: 0, size: len };
     if input.len() < len { return table; }
     for _ in 0..len - 1 {
