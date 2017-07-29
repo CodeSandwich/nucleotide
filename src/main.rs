@@ -7,6 +7,7 @@ use std::thread;
 use std::sync::Arc;
 use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hasher};
+use std::u64;
 
 const SEQ_LENS: [usize; 7] = [1, 2, 3, 4, 6, 12, 18];
 const LOOKUPS: [&'static str; 5] = ["GGT", "GGTA", "GGTATT", "GGTATTTTAATT", "GGTATTTTAATTTATAGT"];
@@ -46,12 +47,23 @@ fn decode(mut v: u64, len: usize) -> String {
 
 struct Buffer{
     value: u64,
-    size: usize,
+    mask: u64,
 }
 
 impl Buffer {
+    fn new(len: usize) -> Self {
+        Buffer {
+            value: 0,
+            mask: !(u64::MAX << (2 * len))
+        }
+    }
+
     fn push(&mut self, c: u8) {
-        self.value = (self.value << 2) % (1 << (2 * self.size)) + (c as u64);
+        self.value = (self.value << 2) | (c as u64);
+    }
+
+    fn get_value(&self) -> u64 {
+        self.value & self.mask
     }
 }
 
@@ -74,7 +86,7 @@ impl Hasher for U64Hasher {
 
 fn parse(mut input: &[u8], len: usize) -> Table {
     let mut table = Table::with_hasher(BuildHasherDefault::<U64Hasher>::default());
-    let mut buffer = Buffer{ value: 0, size: len };
+    let mut buffer = Buffer::new(len);
     if input.len() < len { return table; }
     for _ in 0..len - 1 {
         buffer.push(input[0]);
@@ -83,8 +95,7 @@ fn parse(mut input: &[u8], len: usize) -> Table {
     while input.len() != 0 {
         buffer.push(input[0]);
         input = &input[1..];
-        let counter = table.entry(buffer.value).or_insert(0);
-        *counter += 1;
+        *table.entry(buffer.get_value()).or_insert(0) += 1;
     }
     table
 }
