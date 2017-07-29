@@ -58,11 +58,8 @@ impl Buffer {
         }
     }
 
-    fn push(&mut self, c: u8) {
+    fn push(&mut self, c: u8) -> u64 {
         self.value = (self.value << 2) | (c as u64);
-    }
-
-    fn get_value(&self) -> u64 {
         self.value & self.mask
     }
 }
@@ -84,19 +81,14 @@ impl Hasher for U64Hasher {
     }
 }
 
-fn parse(mut input: &[u8], len: usize) -> Table {
+fn parse(input: &[u8], len: usize) -> Table {
     let mut table = Table::with_hasher(BuildHasherDefault::<U64Hasher>::default());
     let mut buffer = Buffer::new(len);
-    if input.len() < len { return table; }
-    for _ in 0..len - 1 {
-        buffer.push(input[0]);
-        input = &input[1..];
-    }
-    while input.len() != 0 {
-        buffer.push(input[0]);
-        input = &input[1..];
-        *table.entry(buffer.get_value()).or_insert(0) += 1;
-    }
+    input.iter()
+        .map(|i| buffer.push(*i))
+        .skip(len - 1)
+        .map(|b| *table.entry(b).or_insert(0) += 1)
+        .count();
     table
 }
 
